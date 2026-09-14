@@ -136,6 +136,7 @@ td.a{font-family:var(--serif);font-size:14.5px;white-space:pre-wrap;max-width:44
    ============================================================ */
 var CONFIG = {
   firm: "Ascend Quant",
+  adminCode: "ascendquant:3",
 
   /* To host this as a real website, paste your Firebase Realtime
      Database URL between the quotes. See README for the 4 steps.
@@ -217,6 +218,26 @@ var Store = {
       }
       return arr;
     }catch(e){ return []; }
+  },
+  async remove(path){
+    try{
+      if(MODE === "firebase"){
+        var r = await fetch(fbUrl(path), {method:"DELETE"});
+        return r.ok;
+      }
+      if(MODE === "local"){
+        var exact = "iv:" + path;
+        var prefix = exact + "/";
+        var keys = [];
+        for(var i=0;i<localStorage.length;i++){
+          var k = localStorage.key(i);
+          if(k === exact || (k && k.indexOf(prefix) === 0)) keys.push(k);
+        }
+        keys.forEach(function(k){ localStorage.removeItem(k); });
+        return true;
+      }
+      return false;
+    }catch(e){ return false; }
   }
 };
 
@@ -313,10 +334,409 @@ function stopTimers(){
 /* ============================================================
    4. LANDING
    ============================================================ */
-function landing(){ candidateView(); }
+function landing(){
+  stopTimers();
+  app.innerHTML =
+    '<div class="wrap">'
+    + '<p class="hint" style="margin:0 0 30px">' + esc(CONFIG.firm) + '</p>'
+    + modeBanner()
+    + '<h1>Thank you for coming to the ' + esc(CONFIG.firm) + ' final round interview.</h1>'
+    + '<p class="lede">Questions are sent one at a time and each is timed. When the clock reaches zero your answer '
+    + 'submits on its own, so write as you go rather than saving it all for the end.</p>'
+    + '<button class="door" id="asCand"><b>I am here to interview</b><span>Enter your name and wait for the first question</span></button>'
+    + '<button class="door" id="asHost"><b>Run the interview</b><span>Passcode required</span></button>'
+    + '</div>';
+  $("#asCand").onclick = candidateView;
+  $("#asHost").onclick = hostGate;
+}
 
 /* ============================================================
-   5. CANDIDATE
+   5. INTERVIEWER
+   ============================================================ */
+var H = { sessions:[], liveId:null, sid:null, st:null, cands:[], tab:"live", lastQ:"", note:"" };
+
+async function hostGate(){
+  stopTimers();
+  var unlocked = await Mine.get("unlocked");
+  if(unlocked === true) return hostBoot();
+  app.innerHTML =
+    '<div class="wrap">'
+    + '<p class="hint" style="margin:0 0 30px">' + esc(CONFIG.firm) + '</p>'
+    + '<h1>Interviewer console</h1>'
+    + '<p class="lede">Enter the passcode to send questions and collect answers.</p>'
+    + '<div class="sheet">'
+    + '<input class="field" id="pw" type="password" placeholder="Passcode" autocomplete="off">'
+    + '<p class="note" id="pwErr" style="color:var(--red);display:none"></p>'
+    + '<div class="row" style="margin-top:14px">'
+    + '<button class="btn" id="go">Unlock</button>'
+    + '<button class="btn quiet" id="back">Back</button>'
+    + '</div></div></div>';
+  var tryIt = async function(){
+    if($("#pw").value === CONFIG.adminCode){
+      await Mine.set("unlocked", true);
+      hostBoot();
+    }else{
+      var e = $("#pwErr");
+      e.style.display = "block";
+      e.textContent = "That passcode does not match.";
+    }
+  };
+  $("#go").onclick = tryIt;
+  $("#back").onclick = landing;
+  $("#pw").onkeydown = function(ev){ if(ev.key === "Enter") tryIt(); };
+  $("#pw").focus();
+}
+
+async function hostBoot(){
+  var idxRaw = await Store.get(P.index);
+  H.sessions = Array.isArray(idxRaw) ? idxRaw : (idxRaw ? Object.keys(idxRaw).map(function(k){ return idxRaw[k]; }) : []);
+  var live = await Store.get(P.live);
+  H.liveId = live && live.sid ? live.sid : null;
+  H.sid = H.liveId || (H.sessions.length ? H.sessions[H.sessions.length-1].id : null);
+  H.st = H.sid ? await Store.get(P.state(H.sid)) : null;
+  H.cands = H.sid ? await Store.children(P.room(H.sid)) : [];
+  hostRender();
+  stopTimers();
+  ticker = setInterval(hostTick, 250);
+  poller = setInterval(hostPoll, CONFIG.pollMs);
+}
+
+var polling = false;
+async function hostPoll(){
+  if(polling || !H.sid) return;
+  polling = true;
+  H.cands = await Store.children(P.room(H.sid));
+  H.cands.sort(function(a,b){ return (a.joinedAt||0) - (b.joinedAt||0); });
+  if(H.tab === "live") paintRoster();
+  polling = false;
+}
+
+/* archive a question a few seconds after it expires, so every
+   candidate has had time to auto submit first */
+var archiving = false;
+async function hostTick(){
+  var q = H.st && H.st.activeQ;
+  if(q){
+    var remain = q.endsAt - Date.now();
+    var bar = $("#hBar"), cl = $("#hClock");
+    if(bar) bar.style.height = Math.max(0, Math.min(100, (remain/(q.durationSec*1000))*100)) + "%";
+    if(cl){
+      cl.textContent = clock(remain);
+      cl.className = "clock" + (remain < q.durationSec*200 ? " low" : "");
+    }
+    if(Date.now() > q.endsAt + 3000 && !archiving){
+      archiving = true;
+      await closeQuestion(true);
+      archiving = false;
+    }
+  }
+}
+
+async function saveState(next){
+  H.st = next;
+  await Store.set(P.state(next.sid), next);
+}
+
+async function newSession(title){
+  var id = uid("ses");
+  var rec = {id:id, title:title, createdAt:Date.now()};
+  H.sessions = H.sessions.concat([rec]);
+  await Store.set(P.index, H.sessions);
+  var fresh = {sid:id, title:title, activeQ:null, asked:[], status:"lobby", createdAt:Date.now()};
+  await Store.set(P.state(id), fresh);
+  await Store.set(P.live, {sid:id, at:Date.now()});
+  H.sid = id; H.liveId = id; H.st = fresh; H.cands = []; H.tab = "live";
+  H.note = 'Started "' + title + '" at question 1. Every earlier session keeps its answers.';
+  hostRender();
+}
+
+async function makeLive(id){
+  await Store.set(P.live, {sid:id, at:Date.now()});
+  H.liveId = id;
+  H.note = "Candidates are now pointed at this session.";
+  hostRender();
+}
+
+async function openSession(id){
+  H.sid = id;
+  H.st = await Store.get(P.state(id));
+  H.cands = await Store.children(P.room(id));
+  hostRender();
+}
+
+async function sendQuestion(text, seconds){
+  var start = Date.now();
+  var q = {
+    id: uid("q"),
+    index: (H.st.asked || []).length + 1,
+    text: text,
+    durationSec: seconds,
+    startedAt: start,
+    endsAt: start + seconds*1000
+  };
+  H.note = "";
+  await saveState(Object.assign({}, H.st, {activeQ:q, status:"question", asked:H.st.asked || []}));
+  hostRender();
+}
+
+async function closeQuestion(auto){
+  if(!H.st || !H.st.activeQ) return;
+  var q = H.st.activeQ;
+  var asked = (H.st.asked || []).concat([Object.assign({}, q, {endedAt: auto ? q.endsAt : Date.now()})]);
+  await saveState(Object.assign({}, H.st, {activeQ:null, asked:asked, status:"waiting"}));
+  if(!auto) H.note = "Question closed. Candidates are on the waiting screen.";
+  hostRender();
+}
+
+async function addTime(extra){
+  if(!H.st || !H.st.activeQ) return;
+  var q = Object.assign({}, H.st.activeQ, {
+    endsAt: H.st.activeQ.endsAt + extra*1000,
+    durationSec: H.st.activeQ.durationSec + extra
+  });
+  await saveState(Object.assign({}, H.st, {activeQ:q}));
+}
+
+function answerOf(c, q){ return c.answers && c.answers[q.id] ? c.answers[q.id] : null; }
+
+function hostRender(){
+  var st = H.st, q = st && st.activeQ;
+  var tabs = [["live","Live"],["results","Answers"],["sessions","Sessions"]].map(function(t){
+    return '<button class="tab" data-tab="' + t[0] + '" aria-current="' + (H.tab===t[0]) + '">' + t[1] + '</button>';
+  }).join("");
+
+  var body = "";
+  if(!st){
+    body = '<div class="sheet"><h2>No interviews yet</h2>'
+      + '<p class="note">Create one to open a session. Candidates always join whichever session is live.</p>'
+      + '<div class="row"><input class="field" id="newTitle" style="flex:1 1 240px" placeholder="Session name, for example Final round, Tuesday 2pm">'
+      + '<button class="btn" id="mk">Create interview</button></div></div>';
+  } else if(H.tab === "live"){
+    body = (H.liveId !== H.sid
+      ? '<div class="banner">You are looking at an earlier session. Candidates cannot see questions sent from here. '
+        + '<button class="btn sm" id="mkLive" style="margin-top:8px">Point candidates at this session</button></div>'
+      : "")
+      + '<div class="split"><div>' + (q ? liveQuestionPanel(q) : composerPanel()) + '</div>'
+      + '<div><div class="sheet"><h2>In the room</h2>'
+      + '<p class="note">Updates every ' + (CONFIG.pollMs/1000).toFixed(1) + ' seconds.</p>'
+      + '<div id="roster"></div></div></div></div>';
+  } else if(H.tab === "results"){
+    body = resultsPanel();
+  } else {
+    body = sessionsPanel();
+  }
+
+  app.innerHTML =
+    '<div class="mast"><span class="firm">' + esc(CONFIG.firm) + '</span>'
+    + '<span class="hint">' + (H.liveId === H.sid ? "live" : "not live") + '</span>'
+    + '<div class="tabs">' + tabs + '<button class="tab" id="leave">Exit</button></div></div>'
+    + '<div class="wrapWide" style="padding-top:18px">'
+    + modeBanner()
+    + (H.note ? '<div class="banner ok">' + esc(H.note) + '</div>' : "")
+    + body + '</div>';
+
+  Array.prototype.forEach.call(document.querySelectorAll(".tab[data-tab]"), function(b){
+    b.onclick = function(){ H.tab = b.getAttribute("data-tab"); H.note = ""; hostRender(); };
+  });
+  $("#leave").onclick = landing;
+
+  if($("#mk")) $("#mk").onclick = function(){
+    var t = $("#newTitle").value.trim() || ("Interview " + new Date().toLocaleDateString());
+    newSession(t);
+  };
+  if($("#mkLive")) $("#mkLive").onclick = function(){ makeLive(H.sid); };
+
+  wireComposer();
+  wireResults();
+  wireSessions();
+  if(H.tab === "live") paintRoster();
+}
+
+function composerPanel(){
+  var n = ((H.st && H.st.asked) || []).length + 1;
+  var chips = [60,120,180,300,600].map(function(s){
+    return '<button class="chip" data-sec="' + s + '" aria-pressed="false">' + (s<60 ? s+"s" : (s/60)+" min") + '</button>';
+  }).join("");
+  return '<div class="sheet"><h2>Send question ' + n + '</h2>'
+    + '<p class="note">Candidates sit on the waiting screen until you send this.</p>'
+    + '<textarea class="field" id="qText" rows="7" placeholder="Type the question exactly as the candidate should read it."></textarea>'
+    + '<div class="row" style="margin-top:12px">' + chips
+    + '<input class="field" id="qSec" style="width:120px" placeholder="or seconds" inputmode="numeric"></div>'
+    + '<div class="row" style="margin-top:16px"><button class="btn" id="send">Send to candidates</button>'
+    + '<span class="hint" id="secLabel">180 seconds on the clock</span></div></div>';
+}
+
+function liveQuestionPanel(q){
+  return '<div class="book"><div class="margin"><i id="hBar" style="height:100%"></i></div><div class="leaf">'
+    + '<div class="head"><span class="qn">Question ' + q.index + ' is open</span>'
+    + '<span class="clock" id="hClock">' + clock(q.endsAt - Date.now()) + '</span></div>'
+    + '<p class="qtext">' + esc(q.text) + '</p>'
+    + '<div class="row"><button class="btn stop" id="endQ">End question now</button>'
+    + '<button class="btn quiet sm" id="p30">Add 30s</button>'
+    + '<button class="btn quiet sm" id="p60">Add 60s</button></div></div></div>';
+}
+
+var pickedSec = 180;
+function wireComposer(){
+  if(!$("#qText")) {
+    if($("#endQ")) $("#endQ").onclick = function(){ closeQuestion(false); };
+    if($("#p30")) $("#p30").onclick = function(){ addTime(30); };
+    if($("#p60")) $("#p60").onclick = function(){ addTime(60); };
+    return;
+  }
+  var chips = document.querySelectorAll(".chip[data-sec]");
+  var custom = $("#qSec"), label = $("#secLabel");
+  function refresh(){
+    var c = parseInt(custom.value, 10);
+    var val = c > 0 ? c : pickedSec;
+    Array.prototype.forEach.call(chips, function(b){
+      b.setAttribute("aria-pressed", String(!(c > 0) && parseInt(b.getAttribute("data-sec"),10) === pickedSec));
+    });
+    label.textContent = Math.max(10, val) + " seconds on the clock";
+  }
+  Array.prototype.forEach.call(chips, function(b){
+    b.onclick = function(){ pickedSec = parseInt(b.getAttribute("data-sec"),10); custom.value = ""; refresh(); };
+  });
+  custom.oninput = function(){ custom.value = custom.value.replace(/[^0-9]/g,""); refresh(); };
+  refresh();
+  $("#send").onclick = function(){
+    var text = $("#qText").value.trim();
+    if(!text) return;
+    if(H.liveId !== H.sid){ H.note = "Point candidates at this session first."; hostRender(); return; }
+    var c = parseInt(custom.value,10);
+    sendQuestion(text, Math.max(10, c > 0 ? c : pickedSec));
+  };
+}
+
+function paintRoster(){
+  var box = $("#roster");
+  if(!box) return;
+  var q = H.st && H.st.activeQ;
+  if(!H.cands.length){ box.innerHTML = '<p class="hint">Nobody has joined yet.</p>'; return; }
+  box.innerHTML = H.cands.map(function(c){
+    var a = q ? answerOf(c, q) : null;
+    var draft = c.draft && q && c.draft.qid === q.id ? c.draft.text : "";
+    var status = !q ? '<span class="state">waiting</span>'
+      : a ? '<span class="state ' + (a.auto ? "forced" : "in") + '">' + (a.auto ? "time called" : "submitted") + '</span>'
+      : '<span class="state">answering</span>';
+    var sub = a ? "at " + hhmmss(a.submittedAt)
+      : draft ? draft.trim().split(/\s+/).length + " words so far"
+      : q ? "nothing typed yet" : "";
+    if(c.focusLosses) sub += (sub ? ", " : "") + "left the tab " + c.focusLosses + " times";
+    var show = a ? (a.text || "(blank)") : draft;
+    return '<div class="person"><div class="line"><b>' + esc(c.name) + '</b><span class="grow"></span>' + status + '</div>'
+      + (sub ? '<div class="state">' + esc(sub) + '</div>' : "")
+      + (show ? '<div class="excerpt">' + esc(show) + '</div>' : "") + '</div>';
+  }).join("");
+}
+
+function exportRows(){
+  var rows = [["Session","Question","Prompt","Candidate","Answer","Submitted","Time called","Seconds used","Tab switches"]];
+  var asked = (H.st && H.st.asked) || [];
+  asked.forEach(function(q){
+    H.cands.forEach(function(c){
+      var a = answerOf(c, q);
+      rows.push([
+        H.st.title, q.index, q.text, c.name,
+        a ? a.text : "",
+        a ? new Date(a.submittedAt).toLocaleString() : "no submission",
+        a ? (a.auto ? "yes" : "no") : "",
+        a ? Math.max(0, Math.round((a.submittedAt - q.startedAt)/1000)) : "",
+        c.focusLosses || 0
+      ]);
+    });
+  });
+  return rows;
+}
+
+function resultsPanel(){
+  var asked = (H.st && H.st.asked) || [];
+  var head = '<div class="sheet tight"><h2>' + esc(H.st.title) + '</h2>'
+    + '<p class="note">' + asked.length + ' closed question' + (asked.length===1?"":"s") + ', '
+    + H.cands.length + ' candidate' + (H.cands.length===1?"":"s") + ', started ' + esc(stamp(H.st.createdAt)) + '</p>'
+    + '<div class="row"><button class="btn sm" id="csv"' + (asked.length?"":" disabled") + '>Download CSV</button>'
+    + '<button class="btn quiet sm" id="cp"' + (asked.length?"":" disabled") + '>Copy for Excel</button></div></div>';
+  if(!asked.length) return head + '<p class="hint">Nothing here yet. Answers land as soon as a question closes.</p>';
+  return head + asked.map(function(q){
+    return '<div class="sheet"><h3>Question ' + q.index + '</h3>'
+      + '<p class="qtext" style="font-size:16px;margin-bottom:14px">' + esc(q.text) + '</p>'
+      + '<div class="scroll"><table><thead><tr><th style="width:150px">Candidate</th><th>Answer</th><th style="width:110px">Used</th></tr></thead><tbody>'
+      + H.cands.map(function(c){
+          var a = answerOf(c, q);
+          return '<tr><td>' + esc(c.name) + '</td>'
+            + '<td class="a">' + (a ? esc(a.text || "(blank)") : '<span class="hint">no submission</span>') + '</td>'
+            + '<td class="state">' + (a ? Math.max(0, Math.round((a.submittedAt - q.startedAt)/1000)) + "s" + (a.auto ? ", called" : "") : "-") + '</td></tr>';
+        }).join("")
+      + '</tbody></table></div></div>';
+  }).join("");
+}
+
+function wireResults(){
+  if($("#csv")) $("#csv").onclick = function(){
+    var ok = download(H.st.title.replace(/[^\w\- ]/g,"") + ".csv", toCSV(exportRows()));
+    H.note = ok ? "CSV downloaded. Open it in Excel." : "The download was blocked. Use Copy for Excel instead.";
+    hostRender();
+  };
+  if($("#cp")) $("#cp").onclick = function(){
+    var ok = copyText(toCSV(exportRows()));
+    H.note = ok ? "Copied. Paste into Excel, then Data, Text to Columns, Comma." : "Copy failed. Select the table by hand.";
+    hostRender();
+  };
+}
+
+async function clearSessionAnswers(id){
+  var rec = H.sessions.find(function(s){ return s.id === id; });
+  var title = rec ? rec.title : "this session";
+  if(!confirm('Delete all candidate answers from "' + title + '"? This cannot be undone.')) return;
+
+  var ok = await Store.remove(P.room(id));
+  if(!ok){
+    alert("Could not delete the answers. Check Firebase permissions and try again.");
+    return;
+  }
+
+  if(H.sid === id) H.cands = [];
+  H.note = 'Deleted all candidate answers from "' + title + '". The session and its questions were kept.';
+  hostRender();
+}
+
+function sessionsPanel(){
+  var list = H.sessions.slice().reverse().map(function(s){
+    return '<div class="person"><div class="line"><b>' + esc(s.title) + '</b><span class="grow"></span>'
+      + (H.liveId === s.id ? '<span class="state in">live</span>' : "")
+      + (H.sid === s.id ? '<span class="state">open</span>' : "") + '</div>'
+      + '<div class="state">' + esc(stamp(s.createdAt)) + '</div>'
+      + '<div class="row" style="margin-top:9px">'
+      + '<button class="btn quiet sm" data-open="' + s.id + '">View answers</button>'
+      + (H.liveId === s.id ? "" : '<button class="btn quiet sm" data-live="' + s.id + '">Make live</button>')
+      + '<button class="btn stop sm" data-clear="' + s.id + '">Delete answers</button>'
+      + '</div></div>';
+  }).join("");
+  return '<div class="sheet"><h2>Start a new interview</h2>'
+    + '<p class="note">Question numbering restarts at 1. Nothing from earlier sessions is touched.</p>'
+    + '<div class="row"><input class="field" id="newTitle2" style="flex:1 1 240px" placeholder="Session name, for example Final round, Tuesday 2pm">'
+    + '<button class="btn" id="mk2">Create interview</button></div></div>'
+    + '<div class="sheet"><h2>All sessions</h2>' + (list || '<p class="hint">None yet.</p>') + '</div>';
+}
+
+function wireSessions(){
+  if($("#mk2")) $("#mk2").onclick = function(){
+    var t = $("#newTitle2").value.trim() || ("Interview " + new Date().toLocaleDateString());
+    newSession(t);
+  };
+  Array.prototype.forEach.call(document.querySelectorAll("[data-open]"), function(b){
+    b.onclick = function(){ H.tab = "results"; openSession(b.getAttribute("data-open")); };
+  });
+  Array.prototype.forEach.call(document.querySelectorAll("[data-live]"), function(b){
+    b.onclick = function(){ makeLive(b.getAttribute("data-live")); };
+  });
+  Array.prototype.forEach.call(document.querySelectorAll("[data-clear]"), function(b){
+    b.onclick = function(){ clearSessionAnswers(b.getAttribute("data-clear")); };
+  });
+}
+
+/* ============================================================
+   6. CANDIDATE
    ============================================================ */
 var C = { me:null, rec:null, st:null, submitted:null, lastQ:"", dirty:false, painted:"" };
 
@@ -347,7 +767,7 @@ function joinScreen(prefill){
     + '<div class="sheet"><label class="note" for="nm">Your full name</label>'
     + '<input class="field" id="nm" value="' + esc(prefill) + '" placeholder="First and last name" autocomplete="name">'
     + '<div class="row" style="margin-top:15px"><button class="btn" id="join">Join interview</button>'
-    + '</div></div></div>';
+    + '<button class="btn quiet" id="back">Back</button></div></div></div>';
   var go = async function(){
     var n = $("#nm").value.trim();
     if(!n) return;
@@ -364,6 +784,7 @@ function joinScreen(prefill){
     candStart();
   };
   $("#join").onclick = go;
+  $("#back").onclick = landing;
   $("#nm").onkeydown = function(e){ if(e.key === "Enter") go(); };
   $("#nm").focus();
 }
@@ -404,9 +825,22 @@ async function candPoll(){
   var live = await Store.get(P.live);
   var lid = live && live.sid ? live.sid : null;
   if(lid && lid !== C.me.sid){
-    await joinSession(lid, C.me.name);   /* a fresh interview started, carry the name over */
+    /* A new interview went live. Kick the candidate back to the join screen
+       instead of automatically carrying them into the new session. */
+    var oldName = C.me.name || "";
     cPolling = false;
-    candPaint();
+    stopTimers();
+    document.removeEventListener("visibilitychange", onHide);
+    await Mine.set("current", {name: oldName});
+    C.me = null;
+    C.rec = null;
+    C.st = null;
+    C.submitted = null;
+    C.lastQ = "";
+    C.lastQObj = null;
+    C.dirty = false;
+    C.painted = "";
+    joinScreen(oldName);
     return;
   }
   var next = await Store.get(P.state(C.me.sid));
@@ -512,9 +946,9 @@ function candPaint(){
 }
 
 /* ============================================================
-   6. GO
+   7. GO
    ============================================================ */
-candidateView();
+landing();
 </script>
 </body>
 </html>
