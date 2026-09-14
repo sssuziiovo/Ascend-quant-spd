@@ -1,0 +1,520 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ascend Quant interview</title>
+<style>
+:root{
+  --paper:#FFFFFF;
+  --sheet:#FFFFFF;
+  --rule:#DFE1DE;
+  --wash:#F4F5F3;
+  --ink:#181B19;
+  --soft:#6A716C;
+  --faint:#969C97;
+  --red:#C1443A;
+  --blue:#21486B;
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, "Times New Roman", serif;
+}
+*,*::before,*::after{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--paper);
+  color:var(--ink);
+  font-family:var(--sans);
+  font-size:15px;
+  line-height:1.5;
+  -webkit-font-smoothing:antialiased;
+  min-height:100vh;
+}
+button{font-family:inherit;font-size:inherit;cursor:pointer}
+button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+input,textarea{font-family:inherit;font-size:inherit;color:var(--ink)}
+
+.wrap{max-width:680px;margin:0 auto;padding:34px 18px 80px}
+.wrapWide{max-width:1060px;margin:0 auto;padding:0 18px 80px}
+
+/* masthead */
+.mast{display:flex;align-items:baseline;gap:12px;padding:16px 18px;border-bottom:1px solid var(--rule);
+  background:var(--sheet)}
+.mast .firm{font-weight:600;letter-spacing:-.01em}
+.mast .who{margin-left:auto;color:var(--soft);font-size:14px}
+.mast .tabs{display:flex;gap:2px;margin-left:auto}
+.mast .tab{background:none;border:none;border-bottom:2px solid transparent;color:var(--soft);padding:6px 4px;margin:0 7px}
+.mast .tab[aria-current="true"]{border-bottom-color:var(--ink);color:var(--ink);font-weight:600}
+.grow{flex:1}
+
+/* sheets */
+.sheet{background:var(--sheet);border:1px solid var(--rule);border-radius:3px;padding:22px;margin-bottom:16px}
+.sheet.tight{padding:16px 18px}
+h1{font-size:25px;font-weight:600;letter-spacing:-.02em;line-height:1.28;margin:0 0 12px}
+h2{font-size:16px;font-weight:600;margin:0 0 4px;letter-spacing:-.01em}
+h3{font-size:14px;font-weight:600;margin:0 0 6px}
+.lede{color:var(--soft);line-height:1.62;margin:0 0 26px;max-width:56ch}
+.note{color:var(--soft);font-size:13.5px;line-height:1.6;margin:0 0 14px}
+.note:last-child{margin-bottom:0}
+.hint{color:var(--faint);font-size:13px}
+
+/* the answer sheet: red margin rule carries the clock */
+.book{display:flex;gap:0;background:var(--sheet);border:1px solid var(--rule);border-radius:3px;overflow:hidden}
+.margin{width:4px;flex:0 0 4px;background:#EAE4E1;position:relative}
+.margin i{position:absolute;top:0;left:0;right:0;background:var(--red);transition:height .25s linear}
+.leaf{flex:1;min-width:0;padding:20px 22px}
+.head{display:flex;align-items:baseline;gap:12px;border-bottom:1px solid var(--rule);padding-bottom:10px;margin-bottom:18px}
+.head .qn{color:var(--soft);font-size:13.5px}
+.clock{margin-left:auto;font-variant-numeric:tabular-nums;font-size:27px;font-weight:600;letter-spacing:-.02em}
+.clock.low{color:var(--red)}
+.qtext{font-family:var(--serif);font-size:18px;line-height:1.6;white-space:pre-wrap;margin:0 0 20px}
+
+textarea.answer{width:100%;min-height:230px;background:transparent;border:1px solid var(--rule);
+  border-radius:3px;padding:14px;font-family:var(--serif);font-size:16px;line-height:1.68;resize:vertical}
+textarea.answer:disabled{color:var(--soft);background:var(--wash)}
+
+/* controls */
+.field{width:100%;background:#fff;border:1px solid var(--rule);border-radius:3px;padding:10px 12px}
+.field::placeholder{color:var(--faint)}
+textarea.field{resize:vertical;line-height:1.6}
+.btn{background:var(--ink);color:#fff;border:1px solid var(--ink);border-radius:3px;padding:10px 16px;font-weight:600}
+.btn:disabled{opacity:.35;cursor:not-allowed}
+.btn.quiet{background:transparent;color:var(--ink);border-color:var(--rule);font-weight:500}
+.btn.stop{background:var(--red);border-color:var(--red);color:#fff}
+.btn.sm{padding:6px 11px;font-size:13.5px;font-weight:500}
+.row{display:flex;gap:9px;flex-wrap:wrap;align-items:center}
+.chip{background:transparent;border:1px solid var(--rule);border-radius:3px;padding:6px 11px;font-size:13.5px;color:var(--soft)}
+.chip[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:#fff}
+
+/* option doors on the landing page */
+.door{display:block;width:100%;text-align:left;background:var(--sheet);border:1px solid var(--rule);
+  border-radius:3px;padding:16px 18px;margin-bottom:10px;color:var(--ink)}
+.door:hover{border-color:var(--ink)}
+.door b{display:block;font-weight:600;margin-bottom:2px}
+.door span{color:var(--soft);font-size:13.5px}
+
+/* roster */
+.person{border-top:1px solid var(--rule);padding:12px 0}
+.person:first-of-type{border-top:none}
+.person .line{display:flex;align-items:baseline;gap:10px}
+.person b{font-weight:600}
+.state{font-size:12.5px;color:var(--soft)}
+.state.in{color:#2C6B4F}
+.state.forced{color:var(--red)}
+.excerpt{font-family:var(--serif);font-size:14px;line-height:1.6;color:#474B49;white-space:pre-wrap;
+  margin-top:7px;padding-left:11px;border-left:2px solid var(--rule)}
+
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+th{text-align:left;font-weight:600;color:var(--soft);font-size:12.5px;padding:8px 9px;border-bottom:1px solid var(--rule)}
+td{padding:9px;border-bottom:1px solid var(--rule);vertical-align:top;line-height:1.55}
+td.a{font-family:var(--serif);font-size:14.5px;white-space:pre-wrap;max-width:440px}
+.scroll{overflow-x:auto}
+
+/* waiting */
+.hold{text-align:center;padding:64px 14px}
+.hold h2{font-size:19px;margin-bottom:9px}
+.hold p{color:var(--soft);margin:0;line-height:1.6}
+.beat{display:inline-block;width:8px;height:8px;border-radius:50%;background:#2C6B4F;margin-right:9px;
+  animation:beat 2.4s ease-in-out infinite}
+@keyframes beat{0%,100%{opacity:.25}50%{opacity:1}}
+@media (prefers-reduced-motion:reduce){.beat{animation:none;opacity:.7}}
+
+.banner{border:1px solid var(--red);border-left-width:4px;border-radius:3px;padding:12px 14px;
+  margin-bottom:16px;font-size:13.5px;line-height:1.6;background:#FCF6F4}
+.ok{border-color:#2C6B4F;background:#F4F8F4}
+
+.split{display:grid;grid-template-columns:1fr;gap:16px}
+@media (min-width:900px){.split{grid-template-columns:1.2fr .8fr}}
+.footline{color:var(--faint);font-size:12.5px;padding-top:8px}
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<script>
+/* ============================================================
+   1. CONFIG. Edit these two lines, nothing else.
+   ============================================================ */
+var CONFIG = {
+  firm: "Ascend Quant",
+
+  /* To host this as a real website, paste your Firebase Realtime
+     Database URL between the quotes. See README for the 4 steps.
+     Example: "https://ascend-interview-default-rtdb.firebaseio.com"
+     Leave empty to run inside Claude, or for a single-browser test. */
+  firebaseUrl: "https://ascend-quant-spd-default-rtdb.firebaseio.com/",
+
+  pollMs: 1500,
+  draftMs: 2500
+};
+
+/* ============================================================
+   2. STORAGE. Three backends, same interface.
+   ============================================================ */
+var MODE = CONFIG.firebaseUrl ? "firebase" : (typeof window !== "undefined" && window.storage ? "claude" : "local");
+
+function fbUrl(path){ return CONFIG.firebaseUrl.replace(/\/+$/, "") + "/" + path + ".json"; }
+
+var Store = {
+  async get(path){
+    try{
+      if(MODE === "firebase"){
+        var r = await fetch(fbUrl(path), {cache:"no-store"});
+        if(!r.ok) return null;
+        var j = await r.json();
+        return j === null ? null : j;
+      }
+      if(MODE === "claude"){
+        var res = await window.storage.get(path.replace(/\//g, ":"), true);
+        return res ? JSON.parse(res.value) : null;
+      }
+      var raw = localStorage.getItem("iv:" + path);
+      return raw ? JSON.parse(raw) : null;
+    }catch(e){ return null; }
+  },
+  async set(path, value){
+    try{
+      if(MODE === "firebase"){
+        await fetch(fbUrl(path), {method:"PUT", headers:{"Content-Type":"application/json"}, body:JSON.stringify(value)});
+        return true;
+      }
+      if(MODE === "claude"){
+        await window.storage.set(path.replace(/\//g, ":"), JSON.stringify(value), true);
+        return true;
+      }
+      localStorage.setItem("iv:" + path, JSON.stringify(value));
+      return true;
+    }catch(e){ return false; }
+  },
+  /* every value one level under a path */
+  async children(path){
+    try{
+      if(MODE === "firebase"){
+        var r = await fetch(fbUrl(path), {cache:"no-store"});
+        if(!r.ok) return [];
+        var j = await r.json();
+        return j ? Object.keys(j).map(function(k){ return j[k]; }) : [];
+      }
+      if(MODE === "claude"){
+        var pre = path.replace(/\//g, ":") + ":";
+        var res = await window.storage.list(pre, true);
+        var keys = (res && res.keys) || [];
+        var out = [];
+        for(var i=0;i<keys.length;i++){
+          var k = typeof keys[i] === "string" ? keys[i] : (keys[i] && keys[i].key);
+          if(!k) continue;
+          var v = await window.storage.get(k, true).catch(function(){ return null; });
+          if(v) out.push(JSON.parse(v.value));
+        }
+        return out;
+      }
+      var pre2 = "iv:" + path + "/";
+      var arr = [];
+      for(var n=0;n<localStorage.length;n++){
+        var key = localStorage.key(n);
+        if(key && key.indexOf(pre2) === 0){
+          try{ arr.push(JSON.parse(localStorage.getItem(key))); }catch(e2){}
+        }
+      }
+      return arr;
+    }catch(e){ return []; }
+  }
+};
+
+/* private to this browser: who am I, am I unlocked */
+var Mine = {
+  async get(key){
+    try{
+      if(MODE === "claude"){
+        var r = await window.storage.get("my:" + key, false);
+        return r ? JSON.parse(r.value) : null;
+      }
+      var raw = localStorage.getItem("ivme:" + key);
+      return raw ? JSON.parse(raw) : null;
+    }catch(e){ return null; }
+  },
+  async set(key, value){
+    try{
+      if(MODE === "claude"){ await window.storage.set("my:" + key, JSON.stringify(value), false); return true; }
+      localStorage.setItem("ivme:" + key, JSON.stringify(value));
+      return true;
+    }catch(e){ return false; }
+  }
+};
+
+var P = {
+  index: "sessions/index",
+  live: "live",
+  state: function(sid){ return "s/" + sid + "/state"; },
+  cand: function(sid, cid){ return "s/" + sid + "/c/" + cid; },
+  room: function(sid){ return "s/" + sid + "/c"; }
+};
+
+/* ============================================================
+   3. SMALL HELPERS
+   ============================================================ */
+function uid(p){ return p + "_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2,6); }
+function clock(ms){
+  var s = Math.max(0, Math.ceil(ms/1000));
+  return String(Math.floor(s/60)).padStart(2,"0") + ":" + String(s%60).padStart(2,"0");
+}
+function stamp(t){ return t ? new Date(t).toLocaleString(undefined,{month:"short",day:"numeric",hour:"2-digit",minute:"2-digit"}) : ""; }
+function hhmmss(t){ return t ? new Date(t).toLocaleTimeString(undefined,{hour:"2-digit",minute:"2-digit",second:"2-digit"}) : ""; }
+function esc(s){
+  return String(s === null || s === undefined ? "" : s)
+    .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+function el(html){ var d = document.createElement("div"); d.innerHTML = html.trim(); return d.firstElementChild; }
+function $(sel, root){ return (root||document).querySelector(sel); }
+function toCSV(rows){
+  return rows.map(function(r){
+    return r.map(function(v){
+      var s = v === null || v === undefined ? "" : String(v);
+      return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g,'""') + '"' : s;
+    }).join(",");
+  }).join("\r\n");
+}
+function download(filename, text){
+  try{
+    var blob = new Blob(["\uFEFF" + text], {type:"text/csv;charset=utf-8;"});
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(function(){ URL.revokeObjectURL(a.href); }, 4000);
+    return true;
+  }catch(e){ return false; }
+}
+function copyText(text){
+  try{
+    var ta = document.createElement("textarea");
+    ta.value = text; ta.style.position="fixed"; ta.style.opacity="0";
+    document.body.appendChild(ta); ta.select();
+    var ok = document.execCommand("copy");
+    document.body.removeChild(ta);
+    return ok;
+  }catch(e){ return false; }
+}
+function modeBanner(){
+  if(MODE === "firebase") return "";
+  if(MODE === "claude") return "";
+  return '<div class="banner">Local mode. This copy has no database, so questions and answers stay inside this one browser. '
+       + 'The candidate will not see anything from another device. Add a Firebase URL in CONFIG before a real interview.</div>';
+}
+
+var app = document.getElementById("app");
+var ticker = null, poller = null, draftTimer = null;
+
+function stopTimers(){
+  if(ticker){ clearInterval(ticker); ticker = null; }
+  if(poller){ clearInterval(poller); poller = null; }
+  if(draftTimer){ clearInterval(draftTimer); draftTimer = null; }
+}
+
+/* ============================================================
+   4. LANDING
+   ============================================================ */
+function landing(){ candidateView(); }
+
+/* ============================================================
+   5. CANDIDATE
+   ============================================================ */
+var C = { me:null, rec:null, st:null, submitted:null, lastQ:"", dirty:false, painted:"" };
+
+async function candidateView(){
+  stopTimers();
+  var saved = await Mine.get("current");
+  var live = await Store.get(P.live);
+  var lid = live && live.sid ? live.sid : null;
+  if(saved && lid && saved.sid === lid){
+    var mine = await Store.get(P.cand(lid, saved.cid));
+    if(mine){
+      C.me = saved; C.rec = mine;
+      C.st = await Store.get(P.state(lid));
+      return candStart();
+    }
+  }
+  joinScreen(saved && saved.name ? saved.name : "");
+}
+
+function joinScreen(prefill){
+  app.innerHTML =
+    '<div class="wrap">'
+    + '<p class="hint" style="margin:0 0 30px">' + esc(CONFIG.firm) + '</p>'
+    + modeBanner()
+    + '<h1>Thank you for coming to the ' + esc(CONFIG.firm) + ' final round interview.</h1>'
+    + '<p class="lede">Questions arrive one at a time and each one is timed. When the clock hits zero whatever is in '
+    + 'the box is submitted for you, so keep writing rather than saving it for the end.</p>'
+    + '<div class="sheet"><label class="note" for="nm">Your full name</label>'
+    + '<input class="field" id="nm" value="' + esc(prefill) + '" placeholder="First and last name" autocomplete="name">'
+    + '<div class="row" style="margin-top:15px"><button class="btn" id="join">Join interview</button>'
+    + '</div></div></div>';
+  var go = async function(){
+    var n = $("#nm").value.trim();
+    if(!n) return;
+    $("#join").disabled = true; $("#join").textContent = "Joining";
+    var live = await Store.get(P.live);
+    var lid = live && live.sid ? live.sid : null;
+    if(!lid){
+      $("#join").disabled = false; $("#join").textContent = "Join interview";
+      var w = el('<p class="note" style="color:var(--red)">The interviewer has not opened a session yet. Try again in a moment.</p>');
+      $("#nm").parentNode.appendChild(w);
+      return;
+    }
+    await joinSession(lid, n);
+    candStart();
+  };
+  $("#join").onclick = go;
+  $("#nm").onkeydown = function(e){ if(e.key === "Enter") go(); };
+  $("#nm").focus();
+}
+
+async function joinSession(sid, name){
+  var cid = uid("c");
+  var rec = {cid:cid, name:name, joinedAt:Date.now(), answers:{}, focusLosses:0, draft:null};
+  await Store.set(P.cand(sid, cid), rec);
+  await Mine.set("current", {sid:sid, cid:cid, name:name});
+  C.me = {sid:sid, cid:cid, name:name};
+  C.rec = rec;
+  C.submitted = null;
+  C.lastQ = "";
+  C.painted = "";
+  C.st = await Store.get(P.state(sid));
+}
+
+function candStart(){
+  stopTimers();
+  candPaint();
+  ticker = setInterval(candTick, 250);
+  poller = setInterval(candPoll, CONFIG.pollMs);
+  draftTimer = setInterval(saveDraft, CONFIG.draftMs);
+  document.addEventListener("visibilitychange", onHide);
+}
+
+function onHide(){
+  if(document.visibilityState !== "hidden") return;
+  if(!C.rec || !C.st || !C.st.activeQ) return;
+  C.rec.focusLosses = (C.rec.focusLosses || 0) + 1;
+  Store.set(P.cand(C.me.sid, C.me.cid), C.rec);
+}
+
+var cPolling = false;
+async function candPoll(){
+  if(cPolling || !C.me) return;
+  cPolling = true;
+  var live = await Store.get(P.live);
+  var lid = live && live.sid ? live.sid : null;
+  if(lid && lid !== C.me.sid){
+    await joinSession(lid, C.me.name);   /* a fresh interview started, carry the name over */
+    cPolling = false;
+    candPaint();
+    return;
+  }
+  var next = await Store.get(P.state(C.me.sid));
+  if(next) C.st = next;
+  cPolling = false;
+  candPaint();
+}
+
+function currentText(){ var t = $("#ans"); return t ? t.value : ""; }
+
+async function submitAnswer(q, text, auto){
+  if(!q || !C.rec || !C.me) return;
+  if(C.rec.answers && C.rec.answers[q.id]) return;
+  C.rec.answers = C.rec.answers || {};
+  C.rec.answers[q.id] = {qIndex:q.index, text:text, submittedAt:Date.now(), auto:!!auto};
+  C.rec.draft = null;
+  C.submitted = q.id;
+  await Store.set(P.cand(C.me.sid, C.me.cid), C.rec);
+  candPaint();
+}
+
+function saveDraft(){
+  var q = C.st && C.st.activeQ;
+  if(!q || C.submitted === q.id || !C.dirty || !C.rec) return;
+  C.dirty = false;
+  C.rec.draft = {qid:q.id, text:currentText(), at:Date.now()};
+  Store.set(P.cand(C.me.sid, C.me.cid), C.rec);
+}
+
+function candTick(){
+  var q = C.st && C.st.activeQ;
+  if(!q || C.submitted === q.id) return;
+  var remain = q.endsAt - Date.now();
+  var bar = $("#cBar"), cl = $("#cClock");
+  if(bar) bar.style.height = Math.max(0, Math.min(100, (remain/(q.durationSec*1000))*100)) + "%";
+  if(cl){
+    cl.textContent = clock(remain);
+    cl.className = "clock" + (remain < q.durationSec*200 ? " low" : "");
+  }
+  if(remain <= 0) submitAnswer(q, currentText(), true);
+}
+
+function candPaint(){
+  var q = C.st && C.st.activeQ;
+
+  /* the question was pulled before we sent anything: push the box */
+  if(!q && C.lastQ && C.submitted !== C.lastQ && C.lastQObj){
+    submitAnswer(C.lastQObj, currentText(), true);
+    return;
+  }
+
+  if(q){
+    C.lastQObj = q;
+    var mine = C.rec && C.rec.answers ? C.rec.answers[q.id] : null;
+    if(mine) C.submitted = q.id;
+  }
+
+  var key = q ? (q.id + (C.submitted === q.id ? ":done" : ":open")) : "wait";
+  if(key === C.painted) return;    /* never redraw while they are typing */
+  C.painted = key;
+  C.lastQ = q ? q.id : C.lastQ;
+
+  var top = '<div class="mast"><span class="firm">' + esc(CONFIG.firm) + '</span>'
+    + '<span class="who">' + esc(C.me.name) + '</span></div>';
+
+  if(q && C.submitted !== q.id){
+    var draft = C.rec && C.rec.draft && C.rec.draft.qid === q.id ? C.rec.draft.text : "";
+    app.innerHTML = top + '<div class="wrap" style="padding-top:20px">'
+      + '<div class="book"><div class="margin"><i id="cBar" style="height:100%"></i></div><div class="leaf">'
+      + '<div class="head"><span class="qn">Question ' + q.index + '</span>'
+      + '<span class="clock" id="cClock">' + clock(q.endsAt - Date.now()) + '</span></div>'
+      + '<p class="qtext">' + esc(q.text) + '</p>'
+      + '<textarea class="answer" id="ans" placeholder="Write your answer here. It sends on its own when the clock ends."></textarea>'
+      + '<div class="row" style="margin-top:14px"><button class="btn" id="sub">Submit answer</button>'
+      + '<span class="hint">Submitting early locks your answer and ends this question for you.</span>'
+      + '</div></div></div></div>';
+    var ta = $("#ans");
+    ta.value = draft;
+    ta.oninput = function(){ C.dirty = true; };
+    ta.focus();
+    $("#sub").onclick = function(){ submitAnswer(q, currentText(), false); };
+    return;
+  }
+
+  if(q && C.submitted === q.id){
+    var sent = C.rec.answers[q.id].text || "(blank)";
+    app.innerHTML = top + '<div class="wrap" style="padding-top:20px"><div class="sheet">'
+      + '<div class="hold"><h2>Answer submitted</h2><p>Question ' + q.index + ' is locked. Hold tight for the next one.</p></div>'
+      + '<div style="border-top:1px solid var(--rule);padding-top:16px">'
+      + '<p class="note">What you sent</p>'
+      + '<p class="qtext" style="font-size:15.5px;color:#474B49;margin:0">' + esc(sent) + '</p>'
+      + '</div></div></div>';
+    return;
+  }
+
+  var done = (C.st && C.st.asked ? C.st.asked.length : 0);
+  app.innerHTML = top + '<div class="wrap" style="padding-top:20px"><div class="sheet"><div class="hold">'
+    + '<h2><span class="beat"></span>Waiting for the next question</h2>'
+    + '<p>' + (done
+        ? done + ' question' + (done===1?"":"s") + ' done. The next one appears here on its own.'
+        : 'The first question appears here on its own. There is no need to refresh.')
+    + '</p></div></div></div>';
+}
+
+/* ============================================================
+   6. GO
+   ============================================================ */
+candidateView();
+</script>
+</body>
+</html>
