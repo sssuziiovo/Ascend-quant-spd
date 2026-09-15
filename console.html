@@ -33,6 +33,7 @@ button{font-family:inherit;font-size:inherit;cursor:pointer}
 button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
 input,textarea,select{font-family:inherit;font-size:inherit;color:var(--ink)}
 
+.wrap{max-width:720px;margin:0 auto;padding:28px 18px 80px}
 .wrapWide{max-width:1060px;margin:0 auto;padding:0 18px 80px}
 
 /* masthead */
@@ -50,6 +51,7 @@ select.sel{background:#fff;border:1px solid var(--rule);border-radius:3px;paddin
 /* sheets */
 .sheet{background:var(--sheet);border:1px solid var(--rule);border-radius:3px;padding:22px;margin-bottom:16px}
 .sheet.tight{padding:16px 18px}
+h1{font-size:24px;font-weight:600;letter-spacing:-.02em;line-height:1.28;margin:0 0 16px}
 h2{font-size:16px;font-weight:600;margin:0 0 4px;letter-spacing:-.01em}
 h3{font-size:14px;font-weight:600;margin:0 0 6px}
 .note{color:var(--soft);font-size:13.5px;line-height:1.6;margin:0 0 14px}
@@ -77,6 +79,13 @@ textarea.field{resize:vertical;line-height:1.6}
 .btn.stop{background:var(--red);border-color:var(--red);color:#fff}
 .btn.sm{padding:6px 11px;font-size:13.5px;font-weight:500}
 .row{display:flex;gap:9px;flex-wrap:wrap;align-items:center}
+label.lab{display:block;color:var(--soft);font-size:13.5px;margin:0 0 6px}
+input.codefield{letter-spacing:.16em;text-transform:uppercase;font-weight:600}
+.door{display:block;width:100%;text-align:left;background:var(--sheet);border:1px solid var(--rule);
+  border-radius:3px;padding:17px 19px;margin-bottom:10px;color:var(--ink)}
+.door:hover{border-color:var(--ink)}
+.door b{display:block;font-weight:600;margin-bottom:2px}
+.door span{color:var(--soft);font-size:13.5px}
 .chip{background:transparent;border:1px solid var(--rule);border-radius:3px;padding:6px 11px;font-size:13.5px;color:var(--soft)}
 .chip[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:#fff}
 
@@ -121,11 +130,11 @@ var CONFIG = {
      Database URL between the quotes. See README for the 4 steps.
      Example: "https://ascend-interview-default-rtdb.firebaseio.com"
      Leave empty to run inside Claude, or for a single-browser test. */
-  firebaseUrl: "https://ascend-quant-spd-default-rtdb.firebaseio.com",
+  firebaseUrl: "",
 
   /* Where the candidate page lives, so the console can build
      copyable invite links. Example: "https://ascend-interview.netlify.app" */
-  candidateUrl: "https://sssuziiovo.github.io/Ascend-quant-spd/",
+  candidateUrl: "",
 
   pollMs: 1500,
   draftMs: 2500
@@ -288,27 +297,44 @@ function stopTimers(){
 /* ============================================================
    4. INTERVIEWER
    ============================================================ */
-var H = { sessions:[], sid:null, st:null, cands:[], tab:"live", note:"" };
+var H = { sessions:[], sid:null, st:null, cands:[], tab:"live", note:"", step:"choose", err:"" };
 
 function hashSid(){ return (location.hash || "").replace(/^#/, ""); }
 
+function setHash(v){
+  try{
+    history.replaceState(null, "", v ? "#" + v : location.pathname + location.search);
+  }catch(e){
+    location.hash = v || "";
+  }
+}
+
+/* Opening the console lands you on the chooser, not inside whichever
+   interview happened to be last. A hash in the address bar is the one
+   exception, so a second tab can be pinned to a second interview. */
 async function hostBoot(){
   await refreshSessions();
   var want = hashSid();
-  var exists = H.sessions.some(function(s){ return s.id === want; });
-  H.sid = exists ? want : (H.sessions.length ? H.sessions[H.sessions.length-1].id : null);
-  if(H.sid) location.hash = H.sid;
-  H.st = H.sid ? await Store.get(P.state(H.sid)) : null;
-  H.cands = H.sid ? await Store.children(P.room(H.sid)) : [];
-  hostRender();
+  if(want && H.sessions.some(function(s){ return s.id === want; })) return openSession(want);
+  toLobby();
+}
+
+function startHostTimers(){
   stopTimers();
   ticker = setInterval(hostTick, 250);
   poller = setInterval(hostPoll, CONFIG.pollMs);
-  window.onhashchange = function(){
-    var h = hashSid();
-    if(h && h !== H.sid) openSession(h);
-  };
 }
+
+async function toLobby(step){
+  stopTimers();
+  H.sid = null; H.st = null; H.cands = [];
+  H.step = step || "choose"; H.err = "";
+  setHash("");
+  await refreshSessions();
+  lobbyRender();
+}
+
+function paint(){ if(H.sid) hostRender(); else lobbyRender(); }
 
 async function refreshSessions(){
   var list = await Store.children(P.sessions);
@@ -352,6 +378,21 @@ async function saveState(next){
   await Store.set(P.state(next.sid), next);
 }
 
+async function resolveCode(code){
+  if(!code) return null;
+  var hit = await Store.get(P.code(String(code).toUpperCase().trim()));
+  return hit && hit.sid ? hit.sid : null;
+}
+
+async function joinByCode(code){
+  var sid = await resolveCode(code);
+  if(!sid){ H.err = "No interview has that code. Check it for a typo."; return lobbyRender(); }
+  var st = await Store.get(P.state(sid));
+  if(!st){ H.err = "That room exists but has no questions yet. Try again in a moment."; return lobbyRender(); }
+  H.err = "";
+  openSession(sid);
+}
+
 async function freshCode(){
   for(var i=0;i<12;i++){
     var c = makeCode();
@@ -371,17 +412,20 @@ async function newSession(title){
   await Store.set(P.state(id), fresh);
   await refreshSessions();
   H.sid = id; H.st = fresh; H.cands = []; H.tab = "live";
-  location.hash = id;
+  setHash(id);
   H.note = 'Room ' + code + ' is open. Send the candidate ' + inviteLink(code);
+  startHostTimers();
   hostRender();
 }
 
 async function openSession(id){
   H.sid = id;
-  if(location.hash !== "#" + id) location.hash = id;
+  setHash(id);
   H.st = await Store.get(P.state(id));
   H.cands = await Store.children(P.room(id));
+  H.tab = "live";
   H.note = "";
+  startHostTimers();
   hostRender();
 }
 
@@ -399,7 +443,7 @@ async function setClosed(id, closed){
   H.note = closed
     ? "Interview closed. The candidate sees a thank you screen. Every answer is kept."
     : "Interview reopened.";
-  hostRender();
+  paint();
 }
 
 async function sendQuestion(text, seconds){
@@ -476,7 +520,7 @@ function hostRender(){
     + picker
     + (st ? '<span class="code">' + esc(st.code || "") + '</span>' : "")
     + '<div class="tabs">' + tabs
-    + '<button class="tab" id="newTop">New</button>'
+    + '<button class="tab" id="toLobby">Switch</button>'
     + '</div></div>'
     + '<div class="wrapWide" style="padding-top:18px">'
     + modeBanner()
@@ -486,7 +530,7 @@ function hostRender(){
   Array.prototype.forEach.call(document.querySelectorAll(".tab[data-tab]"), function(b){
     b.onclick = function(){ H.tab = b.getAttribute("data-tab"); H.note = ""; hostRender(); };
   });
-  $("#newTop").onclick = function(){ H.tab = "sessions"; H.note = ""; hostRender(); };
+  $("#toLobby").onclick = function(){ H.note = ""; toLobby(); };
   if($("#pick")) $("#pick").onchange = function(){ openSession($("#pick").value); };
   if($("#reopen")) $("#reopen").onclick = function(){ setClosed(H.sid, false); };
   if($("#mk")) $("#mk").onclick = function(){
@@ -648,26 +692,107 @@ function wireResults(){
   };
 }
 
-function sessionsPanel(){
-  var list = H.sessions.slice().reverse().map(function(s){
-    return '<div class="person"><div class="line"><b>' + esc(s.title) + '</b>'
-      + '<span class="code">' + esc(s.code) + '</span><span class="grow"></span>'
-      + (s.closed ? '<span class="state">closed</span>' : '<span class="state in">open</span>')
-      + (H.sid === s.id ? '<span class="state">on screen</span>' : "") + '</div>'
-      + '<div class="state">' + esc(stamp(s.createdAt)) + '</div>'
-      + '<div class="row" style="margin-top:9px">'
-      + '<button class="btn quiet sm" data-open="' + s.id + '">Open</button>'
-      + '<button class="btn quiet sm" data-link="' + s.code + '">Copy link</button>'
-      + '<button class="btn quiet sm" data-' + (s.closed ? "reopen" : "close") + '="' + s.id + '">'
-      + (s.closed ? "Reopen" : "Close") + '</button>'
-      + '</div></div>';
-  }).join("");
-  return '<div class="sheet"><h2>Start another interview</h2>'
-    + '<p class="note">It gets its own code and its own link, and it starts at question 1. '
-    + 'Interviews already running are not touched, and nothing is ever deleted. '
-    + 'To drive two at once, open this console in a second browser tab and pick the other interview there.</p>'
+function sessionRow(s){
+  return '<div class="person"><div class="line"><b>' + esc(s.title) + '</b>'
+    + '<span class="code">' + esc(s.code) + '</span><span class="grow"></span>'
+    + (s.closed ? '<span class="state">finished</span>' : '<span class="state in">in progress</span>')
+    + (H.sid === s.id ? '<span class="state">on screen</span>' : "") + '</div>'
+    + '<div class="state">' + esc(stamp(s.createdAt)) + '</div>'
+    + '<div class="row" style="margin-top:9px">'
+    + '<button class="btn quiet sm" data-open="' + s.id + '">' + (H.sid === s.id ? "Back to it" : "Open") + '</button>'
+    + '<button class="btn quiet sm" data-link="' + s.code + '">Copy link</button>'
+    + '<button class="btn quiet sm" data-' + (s.closed ? "reopen" : "close") + '="' + s.id + '">'
+    + (s.closed ? "Reopen" : "Close") + '</button>'
+    + '</div></div>';
+}
+
+function createBox(heading, blurb){
+  return '<div class="sheet"><h2>' + heading + '</h2><p class="note">' + blurb + '</p>'
     + '<div class="row"><input class="field" id="newTitle2" style="flex:1 1 240px" placeholder="Who is this interview for, for example Wei Zhang, Tue 2pm">'
-    + '<button class="btn" id="mk2">Create interview</button></div></div>'
+    + '<button class="btn" id="mk2">Create interview</button></div></div>';
+}
+
+/* first screen: start something new, or pick up something running */
+function lobbyShell(inner){
+  app.innerHTML =
+    '<div class="mast"><span class="firm">' + esc(CONFIG.firm) + '</span></div>'
+    + '<div class="wrap">'
+    + modeBanner()
+    + (H.note ? '<div class="banner ok">' + esc(H.note) + '</div>' : "")
+    + inner + '</div>';
+}
+
+function lobbyRender(){
+  if(H.step === "new") return lobbyNew();
+  if(H.step === "join") return lobbyJoin();
+
+  var running = H.sessions.filter(function(s){ return !s.closed; }).length;
+  lobbyShell(
+    '<h1>Interviews</h1>'
+    + '<button class="door" id="dNew"><b>Start a new interview</b>'
+    + '<span>A fresh room with its own code, beginning at question 1</span></button>'
+    + '<button class="door" id="dJoin"><b>Join an interview</b>'
+    + '<span>' + (running
+        ? running + ' running right now. Enter a code or pick from the list'
+        : 'Enter a code, or reopen a finished one to read its answers') + '</span></button>'
+  );
+  $("#dNew").onclick = function(){ H.step = "new"; H.note = ""; lobbyRender(); };
+  $("#dJoin").onclick = function(){ H.step = "join"; H.note = ""; lobbyRender(); };
+}
+
+function lobbyNew(){
+  lobbyShell(
+    '<h1>Start a new interview</h1>'
+    + '<div class="sheet">'
+    + '<label class="lab" for="newTitle2">Who is this interview for</label>'
+    + '<input class="field" id="newTitle2" placeholder="For example Wei Zhang, Tuesday 2pm">'
+    + '<p class="note" style="margin-top:12px">It gets its own code and its own link and begins at question 1. '
+    + 'Interviews already running are not touched.</p>'
+    + '<div class="row"><button class="btn" id="mk2">Create interview</button>'
+    + '<button class="btn quiet" id="bk">Back</button></div></div>'
+  );
+  var go = function(){
+    newSession($("#newTitle2").value.trim() || ("Interview " + new Date().toLocaleDateString()));
+  };
+  $("#mk2").onclick = go;
+  $("#bk").onclick = function(){ toLobby(); };
+  $("#newTitle2").onkeydown = function(e){ if(e.key === "Enter") go(); };
+  $("#newTitle2").focus();
+}
+
+function lobbyJoin(){
+  var live = H.sessions.slice().reverse().filter(function(s){ return !s.closed; });
+  var done = H.sessions.slice().reverse().filter(function(s){ return s.closed; });
+  lobbyShell(
+    '<h1>Join an interview</h1>'
+    + '<div class="sheet">'
+    + '<label class="lab" for="jcode">Interview code</label>'
+    + '<input class="field codefield" id="jcode" maxlength="6" placeholder="5 letters" autocomplete="off">'
+    + (H.err ? '<p class="note" style="color:var(--red);margin-top:10px">' + esc(H.err) + '</p>' : "")
+    + '<div class="row" style="margin-top:14px"><button class="btn" id="jgo">Join</button>'
+    + '<button class="btn quiet" id="bk">Back</button></div></div>'
+    + '<div class="sheet"><h2>In progress</h2>'
+    + (live.length
+        ? '<p class="note">Opening one does not disturb the others.</p>' + live.map(sessionRow).join("")
+        : '<p class="hint">Nothing running.</p>')
+    + '</div>'
+    + (done.length ? '<div class="sheet"><h2>Finished</h2>'
+        + '<p class="note">Kept for the record. Open one to read or export its answers.</p>'
+        + done.map(sessionRow).join("") + '</div>' : "")
+  );
+  var go = function(){ joinByCode($("#jcode").value); };
+  $("#jgo").onclick = go;
+  $("#bk").onclick = function(){ toLobby(); };
+  $("#jcode").onkeydown = function(e){ if(e.key === "Enter") go(); };
+  $("#jcode").focus();
+  wireSessions();
+}
+
+function sessionsPanel(){
+  var list = H.sessions.slice().reverse().map(sessionRow).join("");
+  return createBox("Start another interview",
+      "It gets its own code and its own link, and it starts at question 1. "
+      + "Interviews already running are not touched, and nothing is ever deleted.")
     + '<div class="sheet"><h2>All interviews</h2>' + (list || '<p class="hint">None yet.</p>') + '</div>';
 }
 
@@ -682,7 +807,7 @@ function wireSessions(){
     b.onclick = function(){
       var ok = copyText(inviteLink(b.getAttribute("data-link")));
       H.note = ok ? "Link copied." : "Copy failed.";
-      hostRender();
+      paint();
     };
   });
   Array.prototype.forEach.call(document.querySelectorAll("[data-close]"), function(b){
