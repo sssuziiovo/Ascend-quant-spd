@@ -1,0 +1,702 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ascend Quant interview</title>
+<style>
+:root{
+  --paper:#FFFFFF;
+  --sheet:#FFFFFF;
+  --rule:#DFE1DE;
+  --wash:#F4F5F3;
+  --ink:#181B19;
+  --soft:#6A716C;
+  --faint:#969C97;
+  --red:#C1443A;
+  --blue:#21486B;
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, "Times New Roman", serif;
+}
+*,*::before,*::after{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--paper);
+  color:var(--ink);
+  font-family:var(--sans);
+  font-size:15px;
+  line-height:1.5;
+  -webkit-font-smoothing:antialiased;
+  min-height:100vh;
+}
+button{font-family:inherit;font-size:inherit;cursor:pointer}
+button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+input,textarea,select{font-family:inherit;font-size:inherit;color:var(--ink)}
+
+.wrapWide{max-width:1060px;margin:0 auto;padding:0 18px 80px}
+
+/* masthead */
+.mast{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:13px 18px;
+  border-bottom:1px solid var(--rule);background:var(--sheet)}
+.mast .firm{font-weight:600;letter-spacing:-.01em}
+.mast .tabs{display:flex;gap:2px;margin-left:auto}
+.mast .tab{background:none;border:none;border-bottom:2px solid transparent;color:var(--soft);padding:5px 4px;margin:0 7px}
+.mast .tab[aria-current="true"]{border-bottom-color:var(--ink);color:var(--ink);font-weight:600}
+.grow{flex:1}
+select.sel{background:#fff;border:1px solid var(--rule);border-radius:3px;padding:6px 8px;max-width:230px}
+.code{font-variant-numeric:tabular-nums;letter-spacing:.11em;font-weight:600;font-size:13px;
+  border:1px solid var(--rule);border-radius:3px;padding:4px 8px;white-space:nowrap}
+
+/* sheets */
+.sheet{background:var(--sheet);border:1px solid var(--rule);border-radius:3px;padding:22px;margin-bottom:16px}
+.sheet.tight{padding:16px 18px}
+h2{font-size:16px;font-weight:600;margin:0 0 4px;letter-spacing:-.01em}
+h3{font-size:14px;font-weight:600;margin:0 0 6px}
+.note{color:var(--soft);font-size:13.5px;line-height:1.6;margin:0 0 14px}
+.note:last-child{margin-bottom:0}
+.hint{color:var(--faint);font-size:13px}
+
+/* the answer sheet: red margin rule carries the clock */
+.book{display:flex;gap:0;background:var(--sheet);border:1px solid var(--rule);border-radius:3px;overflow:hidden}
+.margin{width:4px;flex:0 0 4px;background:#EAE4E1;position:relative}
+.margin i{position:absolute;top:0;left:0;right:0;background:var(--red);transition:height .25s linear}
+.leaf{flex:1;min-width:0;padding:20px 22px}
+.head{display:flex;align-items:baseline;gap:12px;border-bottom:1px solid var(--rule);padding-bottom:10px;margin-bottom:18px}
+.head .qn{color:var(--soft);font-size:13.5px}
+.clock{margin-left:auto;font-variant-numeric:tabular-nums;font-size:27px;font-weight:600;letter-spacing:-.02em}
+.clock.low{color:var(--red)}
+.qtext{font-family:var(--serif);font-size:18px;line-height:1.6;white-space:pre-wrap;margin:0 0 20px}
+
+/* controls */
+.field{width:100%;background:#fff;border:1px solid var(--rule);border-radius:3px;padding:10px 12px}
+.field::placeholder{color:var(--faint)}
+textarea.field{resize:vertical;line-height:1.6}
+.btn{background:var(--ink);color:#fff;border:1px solid var(--ink);border-radius:3px;padding:10px 16px;font-weight:600}
+.btn:disabled{opacity:.35;cursor:not-allowed}
+.btn.quiet{background:transparent;color:var(--ink);border-color:var(--rule);font-weight:500}
+.btn.stop{background:var(--red);border-color:var(--red);color:#fff}
+.btn.sm{padding:6px 11px;font-size:13.5px;font-weight:500}
+.row{display:flex;gap:9px;flex-wrap:wrap;align-items:center}
+.chip{background:transparent;border:1px solid var(--rule);border-radius:3px;padding:6px 11px;font-size:13.5px;color:var(--soft)}
+.chip[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:#fff}
+
+
+/* roster and lists */
+.person{border-top:1px solid var(--rule);padding:12px 0}
+.person:first-of-type{border-top:none}
+.person .line{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.person b{font-weight:600}
+.state{font-size:12.5px;color:var(--soft)}
+.state.in{color:#2C6B4F}
+.state.forced{color:var(--red)}
+.excerpt{font-family:var(--serif);font-size:14px;line-height:1.6;color:#474B49;white-space:pre-wrap;
+  margin-top:7px;padding-left:11px;border-left:2px solid var(--rule)}
+
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+th{text-align:left;font-weight:600;color:var(--soft);font-size:12.5px;padding:8px 9px;border-bottom:1px solid var(--rule)}
+td{padding:9px;border-bottom:1px solid var(--rule);vertical-align:top;line-height:1.55}
+td.a{font-family:var(--serif);font-size:14.5px;white-space:pre-wrap;max-width:440px}
+.scroll{overflow-x:auto}
+
+
+.banner{border:1px solid var(--red);border-left-width:4px;border-radius:3px;padding:12px 14px;
+  margin-bottom:16px;font-size:13.5px;line-height:1.6;background:#FCF6F4}
+.ok{border-color:#2C6B4F;background:#F4F8F4}
+
+.split{display:grid;grid-template-columns:1fr;gap:16px}
+@media (min-width:900px){.split{grid-template-columns:1.2fr .8fr}}
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<script>
+/* ============================================================
+   1. CONFIG. Edit these, nothing else.
+   ============================================================ */
+var CONFIG = {
+  firm: "Ascend Quant",
+
+  /* To host this as a real website, paste your Firebase Realtime
+     Database URL between the quotes. See README for the 4 steps.
+     Example: "https://ascend-interview-default-rtdb.firebaseio.com"
+     Leave empty to run inside Claude, or for a single-browser test. */
+  firebaseUrl: "",
+
+  /* Where the candidate page lives, so the console can build
+     copyable invite links. Example: "https://ascend-interview.netlify.app" */
+  candidateUrl: "",
+
+  pollMs: 1500,
+  draftMs: 2500
+};
+
+/* ============================================================
+   2. STORAGE. Three backends, same interface.
+   ============================================================ */
+var MODE = CONFIG.firebaseUrl ? "firebase" : (typeof window !== "undefined" && window.storage ? "claude" : "local");
+
+function fbUrl(path){ return CONFIG.firebaseUrl.replace(/\/+$/, "") + "/" + path + ".json"; }
+
+var Store = {
+  async get(path){
+    try{
+      if(MODE === "firebase"){
+        var r = await fetch(fbUrl(path), {cache:"no-store"});
+        if(!r.ok) return null;
+        var j = await r.json();
+        return j === null ? null : j;
+      }
+      if(MODE === "claude"){
+        var res = await window.storage.get(path.replace(/\//g, ":"), true);
+        return res ? JSON.parse(res.value) : null;
+      }
+      var raw = localStorage.getItem("iv:" + path);
+      return raw ? JSON.parse(raw) : null;
+    }catch(e){ return null; }
+  },
+  async set(path, value){
+    try{
+      if(MODE === "firebase"){
+        await fetch(fbUrl(path), {method:"PUT", headers:{"Content-Type":"application/json"}, body:JSON.stringify(value)});
+        return true;
+      }
+      if(MODE === "claude"){
+        await window.storage.set(path.replace(/\//g, ":"), JSON.stringify(value), true);
+        return true;
+      }
+      localStorage.setItem("iv:" + path, JSON.stringify(value));
+      return true;
+    }catch(e){ return false; }
+  },
+  /* every value one level under a path */
+  async children(path){
+    try{
+      if(MODE === "firebase"){
+        var r = await fetch(fbUrl(path), {cache:"no-store"});
+        if(!r.ok) return [];
+        var j = await r.json();
+        return j ? Object.keys(j).map(function(k){ return j[k]; }) : [];
+      }
+      if(MODE === "claude"){
+        var pre = path.replace(/\//g, ":") + ":";
+        var res = await window.storage.list(pre, true);
+        var keys = (res && res.keys) || [];
+        var out = [];
+        for(var i=0;i<keys.length;i++){
+          var k = typeof keys[i] === "string" ? keys[i] : (keys[i] && keys[i].key);
+          if(!k) continue;
+          var v = await window.storage.get(k, true).catch(function(){ return null; });
+          if(v) out.push(JSON.parse(v.value));
+        }
+        return out;
+      }
+      var pre2 = "iv:" + path + "/";
+      var arr = [];
+      for(var n=0;n<localStorage.length;n++){
+        var key = localStorage.key(n);
+        if(key && key.indexOf(pre2) === 0){
+          try{ arr.push(JSON.parse(localStorage.getItem(key))); }catch(e2){}
+        }
+      }
+      return arr;
+    }catch(e){ return []; }
+  }
+};
+
+/* Each interview is its own room. Nothing is global except the
+   code lookup, which maps a five letter code to one session. */
+var P = {
+  sessions: "sessions/list",
+  session: function(sid){ return "sessions/list/" + sid; },
+  code: function(c){ return "codes/" + c; },
+  state: function(sid){ return "s/" + sid + "/state"; },
+  cand: function(sid, cid){ return "s/" + sid + "/c/" + cid; },
+  room: function(sid){ return "s/" + sid + "/c"; }
+};
+
+/* ============================================================
+   3. SMALL HELPERS
+   ============================================================ */
+function uid(p){ return p + "_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2,6); }
+/* no O/0, no I/1/L, so nobody mistypes a code read aloud */
+var ALPHABET = "ACDEFGHJKMNPQRTUVWXY346789";
+function makeCode(){
+  var s = "";
+  for(var i=0;i<5;i++) s += ALPHABET.charAt(Math.floor(Math.random()*ALPHABET.length));
+  return s;
+}
+function clock(ms){
+  var s = Math.max(0, Math.ceil(ms/1000));
+  return String(Math.floor(s/60)).padStart(2,"0") + ":" + String(s%60).padStart(2,"0");
+}
+function stamp(t){ return t ? new Date(t).toLocaleString(undefined,{month:"short",day:"numeric",hour:"2-digit",minute:"2-digit"}) : ""; }
+function hhmmss(t){ return t ? new Date(t).toLocaleTimeString(undefined,{hour:"2-digit",minute:"2-digit",second:"2-digit"}) : ""; }
+function esc(s){
+  return String(s === null || s === undefined ? "" : s)
+    .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+function $(sel, root){ return (root||document).querySelector(sel); }
+function inviteLink(code){
+  var base = (CONFIG.candidateUrl || "").replace(/\/+$/, "");
+  return base ? base + "/?room=" + code : "?room=" + code;
+}
+function toCSV(rows){
+  return rows.map(function(r){
+    return r.map(function(v){
+      var s = v === null || v === undefined ? "" : String(v);
+      return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g,'""') + '"' : s;
+    }).join(",");
+  }).join("\r\n");
+}
+function download(filename, text){
+  try{
+    var blob = new Blob(["\uFEFF" + text], {type:"text/csv;charset=utf-8;"});
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(function(){ URL.revokeObjectURL(a.href); }, 4000);
+    return true;
+  }catch(e){ return false; }
+}
+function copyText(text){
+  try{
+    var ta = document.createElement("textarea");
+    ta.value = text; ta.style.position="fixed"; ta.style.opacity="0";
+    document.body.appendChild(ta); ta.select();
+    var ok = document.execCommand("copy");
+    document.body.removeChild(ta);
+    return ok;
+  }catch(e){ return false; }
+}
+function modeBanner(){
+  if(MODE !== "local") return "";
+  return '<div class="banner">Local mode. This copy has no database, so questions and answers stay inside this one browser. '
+       + 'The candidate will not see anything from another device. Add a Firebase URL in CONFIG before a real interview.</div>';
+}
+
+var app = document.getElementById("app");
+var ticker = null, poller = null, draftTimer = null;
+
+function stopTimers(){
+  if(ticker){ clearInterval(ticker); ticker = null; }
+  if(poller){ clearInterval(poller); poller = null; }
+  if(draftTimer){ clearInterval(draftTimer); draftTimer = null; }
+}
+
+/* ============================================================
+   4. INTERVIEWER
+   ============================================================ */
+var H = { sessions:[], sid:null, st:null, cands:[], tab:"live", note:"" };
+
+function hashSid(){ return (location.hash || "").replace(/^#/, ""); }
+
+async function hostBoot(){
+  await refreshSessions();
+  var want = hashSid();
+  var exists = H.sessions.some(function(s){ return s.id === want; });
+  H.sid = exists ? want : (H.sessions.length ? H.sessions[H.sessions.length-1].id : null);
+  if(H.sid) location.hash = H.sid;
+  H.st = H.sid ? await Store.get(P.state(H.sid)) : null;
+  H.cands = H.sid ? await Store.children(P.room(H.sid)) : [];
+  hostRender();
+  stopTimers();
+  ticker = setInterval(hostTick, 250);
+  poller = setInterval(hostPoll, CONFIG.pollMs);
+  window.onhashchange = function(){
+    var h = hashSid();
+    if(h && h !== H.sid) openSession(h);
+  };
+}
+
+async function refreshSessions(){
+  var list = await Store.children(P.sessions);
+  list.sort(function(a,b){ return (a.createdAt||0) - (b.createdAt||0); });
+  H.sessions = list;
+}
+
+var polling = false;
+async function hostPoll(){
+  if(polling || !H.sid) return;
+  polling = true;
+  H.cands = await Store.children(P.room(H.sid));
+  H.cands.sort(function(a,b){ return (a.joinedAt||0) - (b.joinedAt||0); });
+  if(H.tab === "live") paintRoster();
+  polling = false;
+}
+
+/* archive a question a few seconds after it expires, so every
+   candidate has had time to auto submit first */
+var archiving = false;
+async function hostTick(){
+  var q = H.st && H.st.activeQ;
+  if(q){
+    var remain = q.endsAt - Date.now();
+    var bar = $("#hBar"), cl = $("#hClock");
+    if(bar) bar.style.height = Math.max(0, Math.min(100, (remain/(q.durationSec*1000))*100)) + "%";
+    if(cl){
+      cl.textContent = clock(remain);
+      cl.className = "clock" + (remain < q.durationSec*200 ? " low" : "");
+    }
+    if(Date.now() > q.endsAt + 3000 && !archiving){
+      archiving = true;
+      await closeQuestion(true);
+      archiving = false;
+    }
+  }
+}
+
+async function saveState(next){
+  H.st = next;
+  await Store.set(P.state(next.sid), next);
+}
+
+async function freshCode(){
+  for(var i=0;i<12;i++){
+    var c = makeCode();
+    var taken = await Store.get(P.code(c));
+    if(!taken) return c;
+  }
+  return makeCode() + Math.floor(Math.random()*9);
+}
+
+async function newSession(title){
+  var id = uid("ses");
+  var code = await freshCode();
+  var rec = {id:id, code:code, title:title, createdAt:Date.now(), closed:false};
+  await Store.set(P.session(id), rec);
+  await Store.set(P.code(code), {sid:id});
+  var fresh = {sid:id, title:title, code:code, activeQ:null, asked:[], closed:false, createdAt:Date.now()};
+  await Store.set(P.state(id), fresh);
+  await refreshSessions();
+  H.sid = id; H.st = fresh; H.cands = []; H.tab = "live";
+  location.hash = id;
+  H.note = 'Room ' + code + ' is open. Send the candidate ' + inviteLink(code);
+  hostRender();
+}
+
+async function openSession(id){
+  H.sid = id;
+  if(location.hash !== "#" + id) location.hash = id;
+  H.st = await Store.get(P.state(id));
+  H.cands = await Store.children(P.room(id));
+  H.note = "";
+  hostRender();
+}
+
+async function setClosed(id, closed){
+  var st = id === H.sid ? H.st : await Store.get(P.state(id));
+  if(st){
+    st.closed = closed;
+    st.activeQ = closed ? null : st.activeQ;
+    await Store.set(P.state(id), st);
+    if(id === H.sid) H.st = st;
+  }
+  var rec = H.sessions.filter(function(s){ return s.id === id; })[0];
+  if(rec){ rec.closed = closed; await Store.set(P.session(id), rec); }
+  await refreshSessions();
+  H.note = closed
+    ? "Interview closed. The candidate sees a thank you screen. Every answer is kept."
+    : "Interview reopened.";
+  hostRender();
+}
+
+async function sendQuestion(text, seconds){
+  var start = Date.now();
+  var q = {
+    id: uid("q"),
+    index: (H.st.asked || []).length + 1,
+    text: text,
+    durationSec: seconds,
+    startedAt: start,
+    endsAt: start + seconds*1000
+  };
+  H.note = "";
+  await saveState(Object.assign({}, H.st, {activeQ:q, asked:H.st.asked || []}));
+  hostRender();
+}
+
+async function closeQuestion(auto){
+  if(!H.st || !H.st.activeQ) return;
+  var q = H.st.activeQ;
+  var asked = (H.st.asked || []).concat([Object.assign({}, q, {endedAt: auto ? q.endsAt : Date.now()})]);
+  await saveState(Object.assign({}, H.st, {activeQ:null, asked:asked}));
+  if(!auto) H.note = "Question closed. The candidate is on the waiting screen.";
+  hostRender();
+}
+
+async function addTime(extra){
+  if(!H.st || !H.st.activeQ) return;
+  var q = Object.assign({}, H.st.activeQ, {
+    endsAt: H.st.activeQ.endsAt + extra*1000,
+    durationSec: H.st.activeQ.durationSec + extra
+  });
+  await saveState(Object.assign({}, H.st, {activeQ:q}));
+}
+
+function answerOf(c, q){ return c.answers && c.answers[q.id] ? c.answers[q.id] : null; }
+
+function hostRender(){
+  var st = H.st, q = st && st.activeQ;
+  var tabs = [["live","Live"],["results","Answers"],["sessions","All interviews"]].map(function(t){
+    return '<button class="tab" data-tab="' + t[0] + '" aria-current="' + (H.tab===t[0]) + '">' + t[1] + '</button>';
+  }).join("");
+
+  var picker = H.sessions.length
+    ? '<select class="sel" id="pick">' + H.sessions.slice().reverse().map(function(s){
+        return '<option value="' + s.id + '"' + (s.id===H.sid ? " selected" : "") + '>'
+             + esc(s.title) + (s.closed ? " (closed)" : "") + '</option>';
+      }).join("") + '</select>'
+    : "";
+
+  var body = "";
+  if(!st){
+    body = '<div class="sheet"><h2>No interviews yet</h2>'
+      + '<p class="note">Each interview you create gets its own code and its own link. Several can run at the same time without touching each other.</p>'
+      + '<div class="row"><input class="field" id="newTitle" style="flex:1 1 240px" placeholder="Who is this interview for, for example Wei Zhang, Tue 2pm">'
+      + '<button class="btn" id="mk">Create interview</button></div></div>';
+  } else if(H.tab === "live"){
+    body = (st.closed
+      ? '<div class="banner">This interview is closed. Answers are kept and still exportable. '
+        + '<button class="btn sm" id="reopen" style="margin-top:8px">Reopen it</button></div>'
+      : "")
+      + '<div class="split"><div>' + (q ? liveQuestionPanel(q) : composerPanel()) + '</div>'
+      + '<div>' + invitePanel(st) + '<div class="sheet"><h2>In the room</h2>'
+      + '<p class="note">Updates every ' + (CONFIG.pollMs/1000).toFixed(1) + ' seconds.</p>'
+      + '<div id="roster"></div></div></div></div>';
+  } else if(H.tab === "results"){
+    body = resultsPanel();
+  } else {
+    body = sessionsPanel();
+  }
+
+  app.innerHTML =
+    '<div class="mast"><span class="firm">' + esc(CONFIG.firm) + '</span>'
+    + picker
+    + (st ? '<span class="code">' + esc(st.code || "") + '</span>' : "")
+    + '<div class="tabs">' + tabs
+    + '<button class="tab" id="newTop">New</button>'
+    + '</div></div>'
+    + '<div class="wrapWide" style="padding-top:18px">'
+    + modeBanner()
+    + (H.note ? '<div class="banner ok">' + esc(H.note) + '</div>' : "")
+    + body + '</div>';
+
+  Array.prototype.forEach.call(document.querySelectorAll(".tab[data-tab]"), function(b){
+    b.onclick = function(){ H.tab = b.getAttribute("data-tab"); H.note = ""; hostRender(); };
+  });
+  $("#newTop").onclick = function(){ H.tab = "sessions"; H.note = ""; hostRender(); };
+  if($("#pick")) $("#pick").onchange = function(){ openSession($("#pick").value); };
+  if($("#reopen")) $("#reopen").onclick = function(){ setClosed(H.sid, false); };
+  if($("#mk")) $("#mk").onclick = function(){
+    newSession($("#newTitle").value.trim() || ("Interview " + new Date().toLocaleDateString()));
+  };
+
+  wireInvite();
+  wireComposer();
+  wireResults();
+  wireSessions();
+  if(H.tab === "live") paintRoster();
+}
+
+function invitePanel(st){
+  return '<div class="sheet tight"><h2>Candidate link</h2>'
+    + '<p class="note">Code <b>' + esc(st.code) + '</b>. Only someone with this code can reach this interview.</p>'
+    + '<input class="field" id="inv" readonly value="' + esc(inviteLink(st.code)) + '">'
+    + '<div class="row" style="margin-top:10px"><button class="btn quiet sm" id="cpLink">Copy link</button>'
+    + (CONFIG.candidateUrl ? "" : '<span class="hint">Set CONFIG.candidateUrl to get a full link</span>')
+    + '</div></div>';
+}
+
+function wireInvite(){
+  if($("#cpLink")) $("#cpLink").onclick = function(){
+    var ok = copyText($("#inv").value);
+    H.note = ok ? "Link copied." : "Copy failed. Select the box and copy by hand.";
+    hostRender();
+  };
+}
+
+function composerPanel(){
+  var n = ((H.st && H.st.asked) || []).length + 1;
+  var chips = [60,120,180,300,600].map(function(s){
+    return '<button class="chip" data-sec="' + s + '" aria-pressed="false">' + (s<60 ? s+"s" : (s/60)+" min") + '</button>';
+  }).join("");
+  return '<div class="sheet"><h2>Send question ' + n + '</h2>'
+    + '<p class="note">The candidate sits on the waiting screen until you send this.</p>'
+    + '<textarea class="field" id="qText" rows="7" placeholder="Type the question exactly as the candidate should read it."></textarea>'
+    + '<div class="row" style="margin-top:12px">' + chips
+    + '<input class="field" id="qSec" style="width:120px" placeholder="or seconds" inputmode="numeric"></div>'
+    + '<div class="row" style="margin-top:16px"><button class="btn" id="send"' + (H.st.closed ? " disabled" : "") + '>Send to the room</button>'
+    + '<span class="hint" id="secLabel">180 seconds on the clock</span></div></div>';
+}
+
+function liveQuestionPanel(q){
+  return '<div class="book"><div class="margin"><i id="hBar" style="height:100%"></i></div><div class="leaf">'
+    + '<div class="head"><span class="qn">Question ' + q.index + ' is open</span>'
+    + '<span class="clock" id="hClock">' + clock(q.endsAt - Date.now()) + '</span></div>'
+    + '<p class="qtext">' + esc(q.text) + '</p>'
+    + '<div class="row"><button class="btn stop" id="endQ">End question now</button>'
+    + '<button class="btn quiet sm" id="p30">Add 30s</button>'
+    + '<button class="btn quiet sm" id="p60">Add 60s</button></div></div></div>';
+}
+
+var pickedSec = 180;
+function wireComposer(){
+  if(!$("#qText")) {
+    if($("#endQ")) $("#endQ").onclick = function(){ closeQuestion(false); };
+    if($("#p30")) $("#p30").onclick = function(){ addTime(30); };
+    if($("#p60")) $("#p60").onclick = function(){ addTime(60); };
+    return;
+  }
+  var chips = document.querySelectorAll(".chip[data-sec]");
+  var custom = $("#qSec"), label = $("#secLabel");
+  function refresh(){
+    var c = parseInt(custom.value, 10);
+    var val = c > 0 ? c : pickedSec;
+    Array.prototype.forEach.call(chips, function(b){
+      b.setAttribute("aria-pressed", String(!(c > 0) && parseInt(b.getAttribute("data-sec"),10) === pickedSec));
+    });
+    label.textContent = Math.max(10, val) + " seconds on the clock";
+  }
+  Array.prototype.forEach.call(chips, function(b){
+    b.onclick = function(){ pickedSec = parseInt(b.getAttribute("data-sec"),10); custom.value = ""; refresh(); };
+  });
+  custom.oninput = function(){ custom.value = custom.value.replace(/[^0-9]/g,""); refresh(); };
+  refresh();
+  $("#send").onclick = function(){
+    var text = $("#qText").value.trim();
+    if(!text) return;
+    var c = parseInt(custom.value,10);
+    sendQuestion(text, Math.max(10, c > 0 ? c : pickedSec));
+  };
+}
+
+function paintRoster(){
+  var box = $("#roster");
+  if(!box) return;
+  var q = H.st && H.st.activeQ;
+  if(!H.cands.length){ box.innerHTML = '<p class="hint">Nobody has joined this room yet.</p>'; return; }
+  box.innerHTML = H.cands.map(function(c){
+    var a = q ? answerOf(c, q) : null;
+    var draft = c.draft && q && c.draft.qid === q.id ? c.draft.text : "";
+    var status = !q ? '<span class="state">waiting</span>'
+      : a ? '<span class="state ' + (a.auto ? "forced" : "in") + '">' + (a.auto ? "time called" : "submitted") + '</span>'
+      : '<span class="state">answering</span>';
+    var sub = a ? "at " + hhmmss(a.submittedAt)
+      : draft ? draft.trim().split(/\s+/).length + " words so far"
+      : q ? "nothing typed yet" : "";
+    if(c.focusLosses) sub += (sub ? ", " : "") + "left the tab " + c.focusLosses + " times";
+    var show = a ? (a.text || "(blank)") : draft;
+    return '<div class="person"><div class="line"><b>' + esc(c.name) + '</b><span class="grow"></span>' + status + '</div>'
+      + (sub ? '<div class="state">' + esc(sub) + '</div>' : "")
+      + (show ? '<div class="excerpt">' + esc(show) + '</div>' : "") + '</div>';
+  }).join("");
+}
+
+function exportRows(){
+  var rows = [["Interview","Code","Question","Prompt","Candidate","Answer","Submitted","Time called","Seconds used","Tab switches"]];
+  var asked = (H.st && H.st.asked) || [];
+  asked.forEach(function(q){
+    H.cands.forEach(function(c){
+      var a = answerOf(c, q);
+      rows.push([
+        H.st.title, H.st.code || "", q.index, q.text, c.name,
+        a ? a.text : "",
+        a ? new Date(a.submittedAt).toLocaleString() : "no submission",
+        a ? (a.auto ? "yes" : "no") : "",
+        a ? Math.max(0, Math.round((a.submittedAt - q.startedAt)/1000)) : "",
+        c.focusLosses || 0
+      ]);
+    });
+  });
+  return rows;
+}
+
+function resultsPanel(){
+  var asked = (H.st && H.st.asked) || [];
+  var head = '<div class="sheet tight"><h2>' + esc(H.st.title) + '</h2>'
+    + '<p class="note">' + asked.length + ' closed question' + (asked.length===1?"":"s") + ', '
+    + H.cands.length + ' candidate' + (H.cands.length===1?"":"s") + ', started ' + esc(stamp(H.st.createdAt)) + '</p>'
+    + '<div class="row"><button class="btn sm" id="csv"' + (asked.length?"":" disabled") + '>Download CSV</button>'
+    + '<button class="btn quiet sm" id="cp"' + (asked.length?"":" disabled") + '>Copy for Excel</button></div></div>';
+  if(!asked.length) return head + '<p class="hint">Nothing here yet. Answers land as soon as a question closes.</p>';
+  return head + asked.map(function(q){
+    return '<div class="sheet"><h3>Question ' + q.index + '</h3>'
+      + '<p class="qtext" style="font-size:16px;margin-bottom:14px">' + esc(q.text) + '</p>'
+      + '<div class="scroll"><table><thead><tr><th style="width:150px">Candidate</th><th>Answer</th><th style="width:110px">Used</th></tr></thead><tbody>'
+      + H.cands.map(function(c){
+          var a = answerOf(c, q);
+          return '<tr><td>' + esc(c.name) + '</td>'
+            + '<td class="a">' + (a ? esc(a.text || "(blank)") : '<span class="hint">no submission</span>') + '</td>'
+            + '<td class="state">' + (a ? Math.max(0, Math.round((a.submittedAt - q.startedAt)/1000)) + "s" + (a.auto ? ", called" : "") : "-") + '</td></tr>';
+        }).join("")
+      + '</tbody></table></div></div>';
+  }).join("");
+}
+
+function wireResults(){
+  if($("#csv")) $("#csv").onclick = function(){
+    var ok = download(H.st.title.replace(/[^\w\- ]/g,"") + ".csv", toCSV(exportRows()));
+    H.note = ok ? "CSV downloaded. Open it in Excel." : "The download was blocked. Use Copy for Excel instead.";
+    hostRender();
+  };
+  if($("#cp")) $("#cp").onclick = function(){
+    var ok = copyText(toCSV(exportRows()));
+    H.note = ok ? "Copied. Paste into Excel, then Data, Text to Columns, Comma." : "Copy failed. Select the table by hand.";
+    hostRender();
+  };
+}
+
+function sessionsPanel(){
+  var list = H.sessions.slice().reverse().map(function(s){
+    return '<div class="person"><div class="line"><b>' + esc(s.title) + '</b>'
+      + '<span class="code">' + esc(s.code) + '</span><span class="grow"></span>'
+      + (s.closed ? '<span class="state">closed</span>' : '<span class="state in">open</span>')
+      + (H.sid === s.id ? '<span class="state">on screen</span>' : "") + '</div>'
+      + '<div class="state">' + esc(stamp(s.createdAt)) + '</div>'
+      + '<div class="row" style="margin-top:9px">'
+      + '<button class="btn quiet sm" data-open="' + s.id + '">Open</button>'
+      + '<button class="btn quiet sm" data-link="' + s.code + '">Copy link</button>'
+      + '<button class="btn quiet sm" data-' + (s.closed ? "reopen" : "close") + '="' + s.id + '">'
+      + (s.closed ? "Reopen" : "Close") + '</button>'
+      + '</div></div>';
+  }).join("");
+  return '<div class="sheet"><h2>Start another interview</h2>'
+    + '<p class="note">It gets its own code and its own link, and it starts at question 1. '
+    + 'Interviews already running are not touched, and nothing is ever deleted. '
+    + 'To drive two at once, open this console in a second browser tab and pick the other interview there.</p>'
+    + '<div class="row"><input class="field" id="newTitle2" style="flex:1 1 240px" placeholder="Who is this interview for, for example Wei Zhang, Tue 2pm">'
+    + '<button class="btn" id="mk2">Create interview</button></div></div>'
+    + '<div class="sheet"><h2>All interviews</h2>' + (list || '<p class="hint">None yet.</p>') + '</div>';
+}
+
+function wireSessions(){
+  if($("#mk2")) $("#mk2").onclick = function(){
+    newSession($("#newTitle2").value.trim() || ("Interview " + new Date().toLocaleDateString()));
+  };
+  Array.prototype.forEach.call(document.querySelectorAll("[data-open]"), function(b){
+    b.onclick = function(){ H.tab = "live"; openSession(b.getAttribute("data-open")); };
+  });
+  Array.prototype.forEach.call(document.querySelectorAll("[data-link]"), function(b){
+    b.onclick = function(){
+      var ok = copyText(inviteLink(b.getAttribute("data-link")));
+      H.note = ok ? "Link copied." : "Copy failed.";
+      hostRender();
+    };
+  });
+  Array.prototype.forEach.call(document.querySelectorAll("[data-close]"), function(b){
+    b.onclick = function(){ setClosed(b.getAttribute("data-close"), true); };
+  });
+  Array.prototype.forEach.call(document.querySelectorAll("[data-reopen]"), function(b){
+    b.onclick = function(){ setClosed(b.getAttribute("data-reopen"), false); };
+  });
+}
+
+/* ============================================================
+   5. GO
+   ============================================================ */
+hostBoot();
+</script>
+</body>
+</html>
